@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Vehicle, User } from './types';
 import VehicleForm from './components/VehicleForm';
 import VehicleProfile from './components/VehicleProfile';
-import { generateDescription } from './services/geminiService';
+import { generateDescriptionClient } from './services/geminiService';
 import HomePage from './components/HomePage';
 import Garage from './components/Garage';
 import Clock from './components/Clock';
@@ -109,7 +109,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const description = await generateDescription(formData);
+      const description = await generateDescriptionClient(formData);
       
       if (vehicleToEdit) {
         // Update logic

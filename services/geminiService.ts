@@ -1,14 +1,37 @@
 import { GoogleGenAI } from "@google/genai";
 import { Vehicle } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
+// In your client-side component or utility that needs the description
+// For example, if the original code was in `services/ai-description.ts`
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { Vehicle } from '../types'; // Assuming Vehicle type is still needed client-side
 
-// Fix: Updated vehicle type to exclude fields not available at this stage.
-export const generateDescription = async (vehicle: Omit<Vehicle, 'description' | 'id' | 'createdAt'>): Promise<string> => {
+export const generateDescriptionClient = async (
+    vehicle: Omit<Vehicle, 'description' | 'id' | 'createdAt'>
+): Promise<string> => {
+    try {
+        // Note: The API route will be at /api/generate-description
+        const response = await fetch('/api/generate-description', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(vehicle),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to generate description from API.');
+        }
+
+        const data = await response.json();
+        return data.description;
+
+    } catch (error) {
+        console.error("Error calling server-side description API:", error);
+        throw new Error("Failed to generate description. Please try again.");
+    }
+};
     const engineDescription = [
         vehicle.engineCylinders ? `${vehicle.engineCylinders} cylinders` : '',
         vehicle.displacement ? `${vehicle.displacement}L` : ''
