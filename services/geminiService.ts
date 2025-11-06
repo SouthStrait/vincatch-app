@@ -101,4 +101,4 @@ export const generateDescriptionClient = async (
         console.error("Error generating description with Gemini API:", error);
         throw new Error("Failed to communicate with the AI model.");
     }
-};
+;
