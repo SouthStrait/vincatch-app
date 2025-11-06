@@ -1,0 +1,7 @@
+{
+  "name": "VINcatch",
+  "description": "A tool for car owners to generate a professional, shareable profile for their vehicle, complete with AI-generated descriptions, specifications, and photos to maximize trade-in or sale value.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
