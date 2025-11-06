@@ -100,4 +100,3 @@ export default async function (req: VercelRequest, res: VercelResponse) {
         console.error("Error in API route generating description with Gemini API:", error);
         return res.status(500).json({ message: "Failed to generate description due to an internal server error." });
     }
-}
