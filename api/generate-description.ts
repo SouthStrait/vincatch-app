@@ -1,8 +1,6 @@
 // File: api/generate-description.ts (Serverless Function)
 
 import { GoogleGenAI } from "@google/genai";
-// You may need to install the Vercel-specific types if you're using TypeScript:
-// npm install --save-dev @vercel/node
 import type { VercelRequest, VercelResponse } from '@vercel/node'; 
 import { Vehicle } from '../types'; // Assuming types are accessible
 
@@ -20,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 2. Extract vehicle data from the client's request body
     const vehicle: Omit<Vehicle, 'description' | 'id' | 'createdAt'> = req.body;
 
-    // --- PASTE ALL YOUR LOGIC BELOW HERE ---
+    // --- LOGIC STARTS HERE ---
 
     const engineDescription = [
         vehicle.engineCylinders ? `${vehicle.engineCylinders} cylinders` : '',
@@ -29,19 +27,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const prompt = `
         You are an AI assistant creating a vehicle summary.
+        Based on the following vehicle details, images, and any attached service documents, generate a clear, concise, and factual description for a potential buyer.
+        Focus on key features, condition, and recent maintenance mentioned in the service history.
+        Avoid sales jargon and overly enthusiastic language. The goal is a straightforward summary. Do not use markdown.
         // ... (rest of your detailed prompt here) ...
     `;
 
     const validPhotos = vehicle.photos.filter((p): p is string => p !== null);
     const allFileDataUrls = [...validPhotos, ...(vehicle.serviceHistoryPhotos || [])];
 
-    // ... (rest of your fileParts creation logic here) ...
+    // ----------------------------------------------------------------------
+    // 🔥 MISSING CODE BLOCK - THIS DEFINES 'fileParts' AND FIXES THE ERROR
+    // ----------------------------------------------------------------------
+    const fileParts = allFileDataUrls.map(dataUrl => {
+        const parts = dataUrl.split(',');
+        if (parts.length !== 2) {
+            console.warn('Skipping malformed data URL');
+            return null;
+        }
+        const [header, data] = parts;
+        const mimeTypeMatch = header.match(/:(.*?);/);
+        if (!mimeTypeMatch || !mimeTypeMatch[1]) {
+            console.warn('Could not extract mimeType from data URL');
+            return null;
+        }
+        return {
+            inlineData: {
+                mimeType: mimeTypeMatch[1],
+                data,
+            },
+        };
+    }).filter((part): part is { inlineData: { mimeType: string; data: string; }; } => part !== null);
+    // ----------------------------------------------------------------------
     
     // 3. Call the Gemini API
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: { parts: [{ text: prompt }, ...fileParts] },
+            contents: { parts: [{ text: prompt }, ...fileParts] }, // <--- fileParts is now defined
         });
 
         // SUCCESS: Send the description back to the client
