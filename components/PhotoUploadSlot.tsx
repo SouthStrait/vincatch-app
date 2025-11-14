@@ -1,3 +1,4 @@
+import { db } from '../services/firebase';
 import React from 'react';
 import CameraIcon from './icons/CameraIcon';
 

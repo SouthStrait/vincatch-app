@@ -1,3 +1,4 @@
+import { db } from '../services/firebase';
 import React, { useState, useRef, useEffect } from 'react';
 
 interface CameraModalProps {

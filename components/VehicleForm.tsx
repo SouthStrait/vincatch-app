@@ -1,3 +1,4 @@
+import { db } from '../services/firebase';
 import React, { useState, useEffect } from 'react';
 import { Vehicle } from '../types';
 import PhotoUploadSlot from './PhotoUploadSlot';

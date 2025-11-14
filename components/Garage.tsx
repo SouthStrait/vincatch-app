@@ -1,3 +1,4 @@
+import { db } from '../services/firebase';
 import React from 'react';
 import { Vehicle } from '../types';
 import CarIcon from './icons/CarIcon';
