@@ -1,4 +1,4 @@
-import { db } from '../services/firebase';
+
 import React, { useState } from 'react';
 
 interface AuthPageProps {
