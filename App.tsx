@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Vehicle, User } from './types'; // Assuming User is now { email: string; uid: string; }
+import { Vehicle, User } from './types'; // Ensure User is updated in types.ts
 import VehicleForm from './components/VehicleForm';
 import VehicleProfile from './components/VehicleProfile';
 import { generateDescriptionClient } from './services/geminiService';
@@ -17,25 +17,31 @@ import {
     signInWithEmailAndPassword,
     signOut, 
     onAuthStateChanged, 
-    // We import User as FirebaseUser to avoid conflict with your local 'User' type
-    User as FirebaseUser 
+    User as FirebaseUser // Avoids conflict
 } from 'firebase/auth';
 
-import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { 
+    collection, 
+    query, 
+    where, 
+    getDocs, 
+    doc, 
+    setDoc, 
+    serverTimestamp 
+} from 'firebase/firestore';
 
 type View = 'home' | 'form' | 'garage' | 'profile';
 type PendingVehicle = Omit<Vehicle, 'createdAt'>;
-
-// Define a union type for the authenticated user that includes the necessary UID
 type AuthenticatedUser = User & { uid: string };
+
 
 const App: React.FC = () => {
 
-    // ✅ NEW STATE: User tracking and Auth Loading
+ // 1. STATE: User tracking and Auth Loading
     const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
 
-    // REST OF EXISTING STATE
+    // 2. REST OF EXISTING STATE
     const [view, setView] = useState<View>('home');
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     
@@ -47,37 +53,35 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     
     // -------------------------------------------------------------------------
-    // 1. FIREBASE AUTH STATE LISTENER (Replaces ALL localStorage user persistence)
+    // FIREBASE AUTH STATE LISTENER (Cross-device session management)
     // -------------------------------------------------------------------------
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
             if (firebaseUser) {
-                // User is signed in. Set local state with UID for Firestore queries
                 setCurrentUser({ email: firebaseUser.email || 'N/A', uid: firebaseUser.uid });
             } else {
-                // User is signed out
                 setCurrentUser(null);
             }
-            setAuthLoading(false); // Authentication state is known
+            setAuthLoading(false); // Stop loading once session status is known
         });
 
-        // Cleanup subscription
         return unsubscribe; 
     }, []); 
 
     // -------------------------------------------------------------------------
-    // 2. FIRESTORE VEHICLE LOADER (Replaces localStorage vehicle loading)
+    // FIRESTORE VEHICLE LOADER (Fetches data keyed by UID)
     // -------------------------------------------------------------------------
     useEffect(() => {
         const loadVehiclesFromFirestore = async () => {
             if (currentUser?.uid) {
+                // Query Firestore for vehicles matching the current user's UID
                 const q = query(collection(db, 'vehicles'), where('ownerId', '==', currentUser.uid));
                 
                 try {
                     const snapshot = await getDocs(q);
                     const loadedVehicles = snapshot.docs.map(doc => ({
                         id: doc.id,
-                        // Firestore timestamps need to be converted to strings for your Vehicle type
+                        // Handle Firestore timestamp conversion
                         createdAt: (doc.data().createdAt?.toDate() || new Date()).toISOString(), 
                         ...doc.data() as Omit<Vehicle, 'id' | 'createdAt'>
                     }));
@@ -92,11 +96,12 @@ const App: React.FC = () => {
             }
         };
         
-        // This runs on mount, login, and logout
         loadVehiclesFromFirestore();
     }, [currentUser]); 
     
-    
+    // -------------------------------------------------------------------------
+    // Your handler functions start here (handleSignUp, handleLogin, etc.)
+    // -------------------------------------------------------------------------
     // -------------------------------------------------------------------------
     // 3. FIREBASE AUTH HANDLERS (Replaces old localStorage functions)
     // -------------------------------------------------------------------------
@@ -105,7 +110,7 @@ const App: React.FC = () => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-            // Create a user profile document in Firestore (Optional but recommended)
+            // Create a user profile document in Firestore, keyed by UID
             const userDocRef = doc(db, 'users', userCredential.user.uid);
             await setDoc(userDocRef, { 
                 email: email,
@@ -129,14 +134,15 @@ const App: React.FC = () => {
     };
 
     const handleLogout = () => {
-        signOut(auth); // Firebase handles clearing the session
+        signOut(auth); // Use the Firebase signOut function
         setView('home'); 
     };
 
     // -------------------------------------------------------------------------
-    // 4. FIRESTORE DATA HANDLER (Replaces handleSaveVehicle and adds ownerId)
+    // FIRESTORE DATA HANDLER (handleSaveVehicle updated for Firestore)
     // -------------------------------------------------------------------------
-
+    
+    // handleFormSubmit remains the same (preparing pendingVehicle)
     const handleFormSubmit = async (formData: Omit<Vehicle, 'description' | 'id' | 'createdAt'>) => {
         setIsLoading(true);
         setError(null);
@@ -144,18 +150,18 @@ const App: React.FC = () => {
             const description = await generateDescriptionClient(formData);
             
             if (vehicleToEdit) {
-                // Update logic (REMAINS LOCAL FOR NOW, NEED FIRESTORE UPDATE LOGIC)
                 const updatedVehicle: Vehicle = {
                     ...vehicleToEdit,
                     ...formData,
                     description,
                 };
+                // NOTE: A real app would update Firestore here
+                // For now, we update local state
                 setVehicles(prev => prev.map(v => v.id === vehicleToEdit.id ? updatedVehicle : v));
                 setSelectedVehicleId(vehicleToEdit.id);
                 setVehicleToEdit(null);
                 setView('profile');
             } else {
-                // Create logic
                 const newVehicle: PendingVehicle = { 
                     ...formData, 
                     id: `${Date.now()}-${formData.vin}`,
@@ -173,22 +179,20 @@ const App: React.FC = () => {
         }
     };
     
-    const handleSaveVehicle = async () => { // Function is now async
+    const handleSaveVehicle = async () => { 
         if (pendingVehicle && currentUser?.uid) {
             setIsLoading(true);
             try {
-                // Prepare the data for Firestore
                 const vehicleData = {
                     ...pendingVehicle,
-                    createdAt: serverTimestamp(), // Use Firestore's server timestamp
-                    ownerId: currentUser.uid      // CRUCIAL: Link vehicle to the user's UID
+                    createdAt: serverTimestamp(), 
+                    ownerId: currentUser.uid      
                 };
-                delete vehicleData.id; // Remove the temporary ID before saving
+                delete (vehicleData as any).id; 
 
-                // Save the new vehicle to the 'vehicles' collection, getting the Firestore Document Reference
-                const docRef = await setDoc(doc(collection(db, 'vehicles')), vehicleData); 
+                const docRef = doc(collection(db, 'vehicles'));
+                await setDoc(docRef, vehicleData);
                 
-                // Update local state with the new Firestore ID and a local timestamp approximation
                 const vehicleWithId: Vehicle = {
                     ...pendingVehicle,
                     id: docRef.id, 
