@@ -1,7 +1,6 @@
-// services/firebase.js (or wherever you placed it)
-
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth"; // <-- NEW: Auth Import
 
 // 1. Define the configuration object using Vercel's Environment Variables
 const firebaseConfig = {
@@ -13,15 +12,13 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// 2. Initialize Firebase (The Optimization)
-// This uses getApps() to check if the app has already been initialized.
-// This is cleaner and more robust for preventing the "Firebase: App named '[DEFAULT]' already exists" error.
+// 2. Initialize Firebase app once
 const app = !getApps().length
   ? initializeApp(firebaseConfig)
   : getApp();
 
-// 3. Initialize Cloud Firestore and export it
+// 3. Initialize and export services
 export const db = getFirestore(app);
+export const auth = getAuth(app); // <-- CRITICAL: Exporting 'auth' here
 
-// 4. Optionally export the main app object
 export default app;
