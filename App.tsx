@@ -52,7 +52,7 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     
     // -------------------------------------------------------------------------
-    // 3. CONSOLIDATED AUTH AND DATA LISTENER (The primary fix for timing issues)
+    // 3. CONSOLIDATED AUTH AND DATA LISTENER
     // -------------------------------------------------------------------------
     useEffect(() => {
         const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -131,7 +131,7 @@ const App: React.FC = () => {
     };
 
     // -------------------------------------------------------------------------
-    // 5. FIRESTORE DATA HANDLER (handleSaveVehicle updated for Firestore)
+    // 5. FIRESTORE DATA HANDLER (handleSaveVehicle updated to fix 1MB limit)
     // -------------------------------------------------------------------------
     
     const handleFormSubmit = async (formData: Omit<Vehicle, 'description' | 'id' | 'createdAt'>) => {
@@ -146,12 +146,12 @@ const App: React.FC = () => {
                     ...formData,
                     description,
                 };
-                // NOTE: A real app would update Firestore here
                 setVehicles(prev => prev.map(v => v.id === vehicleToEdit.id ? updatedVehicle : v));
                 setSelectedVehicleId(vehicleToEdit.id);
                 setVehicleToEdit(null);
                 setView('profile');
             } else {
+                // Assuming photoData is added by a separate component before save
                 const newVehicle: PendingVehicle = { 
                     ...formData, 
                     id: `${Date.now()}-${formData.vin}`,
@@ -173,16 +173,21 @@ const App: React.FC = () => {
         if (pendingVehicle && currentUser?.uid) {
             setIsLoading(true);
             try {
+                // CRITICAL FIX: Destructure the object to exclude large/unnecessary fields.
+                // We assume the large field is either 'photoData' or a generic image field.
+                // We also exclude the temporary local 'id'.
+                const { id, photoData, imageBase64, ...restOfVehicleData } = pendingVehicle as any;
+
                 const vehicleData = {
-                    ...pendingVehicle,
+                    ...restOfVehicleData, // Only saves the necessary data
                     createdAt: serverTimestamp(), 
                     ownerId: currentUser.uid      
                 };
-                delete (vehicleData as any).id; 
 
                 const docRef = doc(collection(db, 'vehicles'));
                 await setDoc(docRef, vehicleData);
                 
+                // Update local state (including the temporary discarded large data)
                 const vehicleWithId: Vehicle = {
                     ...pendingVehicle,
                     id: docRef.id, 
@@ -194,7 +199,8 @@ const App: React.FC = () => {
                 setView('garage');
             } catch (error) {
                 console.error("Failed to save vehicle to Firestore:", error);
-                setError("Failed to save vehicle data.");
+                // The error screen will now show the actual Firestore rejection reason if it fails again
+                setError("Failed to save vehicle data. (Check console for Firestore data limit errors.)"); 
             } finally {
                 setIsLoading(false);
             }
