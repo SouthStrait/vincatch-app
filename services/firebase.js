@@ -2,15 +2,17 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-// 1. Define the configuration object using Vercel environment variables
+// 1. Configuration object uses the ACTUAL STRING VALUES from your screenshot.
+// This bypasses Vercel's environment variables for testing.
 const firebaseConfig = {
-  // CRITICAL: Must use the exact names set on Vercel
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  // CRITICAL: This is the exact key from your screenshot, used as a string literal:
+  apiKey: "AIzaSyCTt8FpBcSgzywwlzoQMVEj9c_iCP-uJTk", 
+  
+  authDomain: "vincatch-2aefa.firebaseapp.com",
+  projectId: "vincatch-2aefa",
+  storageBucket: "vincatch-2aefa.firebasestorage.app",
+  messagingSenderId: "648548741644",
+  appId: "1:648548741644:web:26d0de643d5f198ed13429",
 };
 
 // 2. Initializes the app only once
