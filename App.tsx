@@ -173,8 +173,8 @@ const handleSaveVehicle = async () => {
     if (pendingVehicle && currentUser?.uid) {
         setIsLoading(true);
         try {
-            // CRITICAL FIX: Destructure the object to exclude all large data fields.
-            // Note: 'restOfVehicleData' now contains everything except the local ID and the two large photo arrays.
+            // CRITICAL FIX: Destructure the object to exclude all large data fields 
+            // defined in your types.ts (photos and serviceHistoryPhotos).
             const { id, photos, serviceHistoryPhotos, ...restOfVehicleData } = pendingVehicle as any;
 
             // Prepare the data for Firestore (now guaranteed to be < 1MB)
@@ -188,9 +188,6 @@ const handleSaveVehicle = async () => {
             const docRef = doc(collection(db, 'vehicles'));
             await setDoc(docRef, vehicleData);
             
-            // Note: If you want to use Firebase Storage to save the actual images (recommended), 
-            // the logic would go here, using the docRef.id as the image path.
-
             // Update local state (including the necessary fields we excluded, as they are needed for the UI display)
             const vehicleWithId: Vehicle = {
                 ...pendingVehicle,
