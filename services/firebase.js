@@ -2,21 +2,36 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-// 1. Configuration relies on parsing a single JSON string from the environment.
-const configString = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
+// Function to safely decode Base64 in the Browser environment
+const decodeBase64 = (encodedString) => {
+    // We rely on the browser's native atob() function for decoding.
+    try {
+        const decoded = atob(encodedString);
+        return decoded;
+    } catch (e) {
+        console.error("Base64 decoding failed:", e);
+        return "{}"; // Return empty object string on failure
+    }
+};
+
+// 1. Get the Base64 encoded string from Vercel
+const encodedConfig = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
 let firebaseConfig = {};
 
-if (configString) {
+if (encodedConfig) {
   try {
-    firebaseConfig = JSON.parse(configString);
+    // Decode the string and parse the resulting JSON
+    const decodedString = decodeBase64(encodedConfig);
+    // Use JSON.parse() on the decoded string
+    firebaseConfig = JSON.parse(decodedString);
   } catch (e) {
-    console.error("FIREBASE CONFIG ERROR: Failed to parse NEXT_PUBLIC_FIREBASE_CONFIG JSON string.", e);
+    console.error("FIREBASE CONFIG ERROR: Failed to parse Base64 config JSON.", e);
   }
 }
 
-// Ensure the config has the minimum required information to prevent a crash
+// Ensure the config has the minimum required information
 if (!firebaseConfig.apiKey) {
-    console.error("FIREBASE FATAL ERROR: apiKey is missing in NEXT_PUBLIC_FIREBASE_CONFIG. Check Vercel environment variable setup.");
+    console.error("FIREBASE FATAL ERROR: apiKey is missing. Check Base64 string in Vercel ENV.");
 }
 
 // 2. Initializes the app only once
