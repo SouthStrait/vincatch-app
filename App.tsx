@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Vehicle, User } from './types'; // Ensure User is updated in types.ts
+import { Vehicle, User } from './types'; 
 import VehicleForm from './components/VehicleForm';
 import VehicleProfile from './components/VehicleProfile';
 import { generateDescriptionClient } from './services/geminiService';
@@ -17,7 +17,7 @@ import {
     signInWithEmailAndPassword,
     signOut, 
     onAuthStateChanged, 
-    User as FirebaseUser // Avoids conflict
+    User as FirebaseUser 
 } from 'firebase/auth';
 
 import { 
@@ -32,12 +32,11 @@ import {
 
 type View = 'home' | 'form' | 'garage' | 'profile';
 type PendingVehicle = Omit<Vehicle, 'createdAt'>;
-type AuthenticatedUser = User & { uid: string };
-
+type AuthenticatedUser = User & { uid: string }; 
 
 const App: React.FC = () => {
 
- // 1. STATE: User tracking and Auth Loading
+    // 1. STATE: User tracking and Auth Loading
     const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
 
@@ -53,70 +52,63 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     
     // -------------------------------------------------------------------------
-    // FIREBASE AUTH STATE LISTENER (Cross-device session management)
+    // 3. CONSOLIDATED AUTH AND DATA LISTENER (The primary fix for timing issues)
     // -------------------------------------------------------------------------
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
             if (firebaseUser) {
-                setCurrentUser({ email: firebaseUser.email || 'N/A', uid: firebaseUser.uid });
+                const authenticatedUser: AuthenticatedUser = { 
+                    email: firebaseUser.email || 'N/A', 
+                    uid: firebaseUser.uid 
+                };
+                setCurrentUser(authenticatedUser);
+                
+                // Load data immediately upon successful authentication
+                const loadVehicles = async (uid: string) => {
+                    const q = query(collection(db, 'vehicles'), where('ownerId', '==', uid));
+                    try {
+                        const snapshot = await getDocs(q);
+                        const loadedVehicles = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            createdAt: (doc.data().createdAt?.toDate() || new Date()).toISOString(), 
+                            ...doc.data() as Omit<Vehicle, 'id' | 'createdAt'>
+                        }));
+                        setVehicles(loadedVehicles);
+                    } catch (error) {
+                        console.error("Could not load vehicles from Firestore", error);
+                        setError("Failed to load vehicle data.");
+                        setVehicles([]);
+                    }
+                };
+                
+                loadVehicles(firebaseUser.uid);
+
             } else {
                 setCurrentUser(null);
+                setVehicles([]);
             }
-            setAuthLoading(false); // Stop loading once session status is known
+            setAuthLoading(false); // Authentication state is now known
         });
 
-        return unsubscribe; 
-    }, []); 
-
-    // -------------------------------------------------------------------------
-    // FIRESTORE VEHICLE LOADER (Fetches data keyed by UID)
-    // -------------------------------------------------------------------------
-    useEffect(() => {
-        const loadVehiclesFromFirestore = async () => {
-            if (currentUser?.uid) {
-                // Query Firestore for vehicles matching the current user's UID
-                const q = query(collection(db, 'vehicles'), where('ownerId', '==', currentUser.uid));
-                
-                try {
-                    const snapshot = await getDocs(q);
-                    const loadedVehicles = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        // Handle Firestore timestamp conversion
-                        createdAt: (doc.data().createdAt?.toDate() || new Date()).toISOString(), 
-                        ...doc.data() as Omit<Vehicle, 'id' | 'createdAt'>
-                    }));
-                    setVehicles(loadedVehicles);
-                } catch (error) {
-                    console.error("Could not load vehicles from Firestore", error);
-                    setError("Failed to load vehicle data.");
-                    setVehicles([]);
-                }
-            } else {
-                setVehicles([]); // Clear vehicles when logged out
-            }
+        // Cleanup: Stop listening when the component unmounts
+        return () => {
+            unsubscribeAuth();
         };
-        
-        loadVehiclesFromFirestore();
-    }, [currentUser]); 
+    }, []); 
+    
     
     // -------------------------------------------------------------------------
-    // Your handler functions start here (handleSignUp, handleLogin, etc.)
-    // -------------------------------------------------------------------------
-    // -------------------------------------------------------------------------
-    // 3. FIREBASE AUTH HANDLERS (Replaces old localStorage functions)
+    // 4. FIREBASE AUTH HANDLERS
     // -------------------------------------------------------------------------
 
     const handleSignUp = async (email: string, password: string) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-            // Create a user profile document in Firestore, keyed by UID
             const userDocRef = doc(db, 'users', userCredential.user.uid);
             await setDoc(userDocRef, { 
                 email: email,
                 createdAt: serverTimestamp(),
             });
-            
             setView('home'); 
 
         } catch (error: any) {
@@ -134,15 +126,14 @@ const App: React.FC = () => {
     };
 
     const handleLogout = () => {
-        signOut(auth); // Use the Firebase signOut function
+        signOut(auth); 
         setView('home'); 
     };
 
     // -------------------------------------------------------------------------
-    // FIRESTORE DATA HANDLER (handleSaveVehicle updated for Firestore)
+    // 5. FIRESTORE DATA HANDLER (handleSaveVehicle updated for Firestore)
     // -------------------------------------------------------------------------
     
-    // handleFormSubmit remains the same (preparing pendingVehicle)
     const handleFormSubmit = async (formData: Omit<Vehicle, 'description' | 'id' | 'createdAt'>) => {
         setIsLoading(true);
         setError(null);
@@ -156,7 +147,6 @@ const App: React.FC = () => {
                     description,
                 };
                 // NOTE: A real app would update Firestore here
-                // For now, we update local state
                 setVehicles(prev => prev.map(v => v.id === vehicleToEdit.id ? updatedVehicle : v));
                 setSelectedVehicleId(vehicleToEdit.id);
                 setVehicleToEdit(null);
@@ -246,12 +236,12 @@ const App: React.FC = () => {
 
     const navigate = (targetView: View) => {
         setError(null);
-        setVehicleToEdit(null); // Clear editing state on navigation
+        setVehicleToEdit(null); 
         setView(targetView);
     };
 
     const renderAppContent = () => {
-        if (isLoading || authLoading) { // Check authLoading here as well
+        if (isLoading || authLoading) { 
             return (
                 <div className="flex flex-col items-center justify-center p-12 bg-gray-900/50 rounded-lg">
                     <svg className="animate-spin h-10 w-10 text-orange-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -336,7 +326,7 @@ const App: React.FC = () => {
             </header>
             
             <main className="max-w-7xl mx-auto">
-                {/* Renders loading, AuthPage, or the main content */}
+                {/* Final Rendering Logic: Checks authLoading first */}
                 {authLoading ? renderAppContent() : (
                     currentUser ? renderAppContent() : <AuthPage onLogin={handleLogin} onSignUp={handleSignUp} />
                 )}
