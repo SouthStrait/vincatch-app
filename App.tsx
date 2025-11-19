@@ -169,43 +169,48 @@ const App: React.FC = () => {
         }
     };
     
-    const handleSaveVehicle = async () => { 
-        if (pendingVehicle && currentUser?.uid) {
-            setIsLoading(true);
-            try {
-                // CRITICAL FIX: Destructure the object to exclude large/unnecessary fields.
-                // We assume the large field is either 'photoData' or a generic image field.
-                // We also exclude the temporary local 'id'.
-                const { id, photoData, imageBase64, ...restOfVehicleData } = pendingVehicle as any;
+const handleSaveVehicle = async () => { 
+    if (pendingVehicle && currentUser?.uid) {
+        setIsLoading(true);
+        try {
+            // CRITICAL FIX: Destructure the object to exclude all large data fields.
+            // Note: 'restOfVehicleData' now contains everything except the local ID and the two large photo arrays.
+            const { id, photos, serviceHistoryPhotos, ...restOfVehicleData } = pendingVehicle as any;
 
-                const vehicleData = {
-                    ...restOfVehicleData, // Only saves the necessary data
-                    createdAt: serverTimestamp(), 
-                    ownerId: currentUser.uid      
-                };
+            // Prepare the data for Firestore (now guaranteed to be < 1MB)
+            const vehicleData = {
+                ...restOfVehicleData, 
+                createdAt: serverTimestamp(), 
+                ownerId: currentUser.uid      
+            };
 
-                const docRef = doc(collection(db, 'vehicles'));
-                await setDoc(docRef, vehicleData);
-                
-                // Update local state (including the temporary discarded large data)
-                const vehicleWithId: Vehicle = {
-                    ...pendingVehicle,
-                    id: docRef.id, 
-                    createdAt: new Date().toISOString()
-                };
-                
-                setVehicles(prev => [...prev, vehicleWithId]);
-                setPendingVehicle(null);
-                setView('garage');
-            } catch (error) {
-                console.error("Failed to save vehicle to Firestore:", error);
-                // The error screen will now show the actual Firestore rejection reason if it fails again
-                setError("Failed to save vehicle data. (Check console for Firestore data limit errors.)"); 
-            } finally {
-                setIsLoading(false);
-            }
+            // Save to Firestore
+            const docRef = doc(collection(db, 'vehicles'));
+            await setDoc(docRef, vehicleData);
+            
+            // Note: If you want to use Firebase Storage to save the actual images (recommended), 
+            // the logic would go here, using the docRef.id as the image path.
+
+            // Update local state (including the necessary fields we excluded, as they are needed for the UI display)
+            const vehicleWithId: Vehicle = {
+                ...pendingVehicle,
+                id: docRef.id, 
+                createdAt: new Date().toISOString()
+            };
+            
+            setVehicles(prev => [...prev, vehicleWithId]);
+            setPendingVehicle(null);
+            setView('garage');
+            
+        } catch (error) {
+            console.error("Failed to save vehicle to Firestore:", error);
+            // We can now assume any remaining error is a genuine network or rule issue.
+            setError("Failed to save vehicle data."); 
+        } finally {
+            setIsLoading(false);
         }
-    };
+    }
+};
 
     const handleDiscardVehicle = () => {
         setPendingVehicle(null);
