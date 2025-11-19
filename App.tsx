@@ -283,8 +283,11 @@ const handleEditVehicle = (vehicleId: string) => {
                 return <VehicleForm onSubmit={handleFormSubmit} initialData={vehicleToEdit} />;
             case 'garage':
                 return <Garage vehicles={vehicles} onSelectVehicle={handleSelectVehicle} onNavigateHome={() => navigate('home')} />;
+            // App.tsx (Inside renderAppContent, inside the switch(view))
+// ...
             case 'profile':
-                const vehicleToShow = pendingVehicle || vehicles.find(v => v.id === selectedVehicleId);
+                // FIX: Ensure vehicles is an array before searching for a vehicle to show
+                const vehicleToShow = pendingVehicle || (Array.isArray(vehicles) ? vehicles.find(v => v.id === selectedVehicleId) : undefined);
                 if (vehicleToShow) {
                     return <VehicleProfile 
                                 vehicle={vehicleToShow} 
