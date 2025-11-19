@@ -220,13 +220,18 @@ const handleSaveVehicle = async () => {
         setView('profile');
     };
     
-    const handleEditVehicle = (vehicleId: string) => {
-        const vehicle = vehicles.find(v => v.id === vehicleId);
-        if (vehicle) {
-            setVehicleToEdit(vehicle);
-            setView('form');
-        }
-    };
+// App.tsx (Replace the existing handleEditVehicle function)
+
+const handleEditVehicle = (vehicleId: string) => {
+    // CRITICAL FIX: Add check to ensure 'vehicles' is an array before calling .find()
+    const vehicle = Array.isArray(vehicles) ? vehicles.find(v => v.id === vehicleId) : undefined;
+    
+    if (vehicle) {
+        setVehicleToEdit(vehicle);
+        setView('form');
+    }
+    // Note: No need for an error if vehicle is undefined, as it will simply not navigate.
+};
 
 
     const handleUpdateVehicleDescription = (vehicleId: string, newDescription: string) => {
