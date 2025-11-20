@@ -234,7 +234,6 @@ const handleEditVehicle = (vehicleId: string) => {
     }
 };
     // Note: No need for an error if vehicle is undefined, as it will simply not navigate.
-};
 
 
     const handleUpdateVehicleDescription = (vehicleId: string, newDescription: string) => {
