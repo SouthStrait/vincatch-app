@@ -355,5 +355,5 @@ const handleEditVehicle = (vehicleId: string) => {
             </footer>
         </div>
     );
-
+};
 export default App;
