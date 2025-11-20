@@ -9,6 +9,7 @@ import Clock from './components/Clock';
 import HomeIcon from './components/icons/HomeIcon';
 import AuthPage from './components/AuthPage';
 import LogoutIcon from './components/icons/LogoutIcon';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 // --- FIREBASE IMPORTS ---
 import { auth, db } from './services/firebase'; 
@@ -223,13 +224,14 @@ const handleSaveVehicle = async () => {
 // App.tsx (Replace the existing handleEditVehicle function)
 
 const handleEditVehicle = (vehicleId: string) => {
-    // CRITICAL FIX: Add check to ensure 'vehicles' is an array before calling .find()
+    // FIX: Ensure vehicles is an array before calling find()
     const vehicle = Array.isArray(vehicles) ? vehicles.find(v => v.id === vehicleId) : undefined;
     
     if (vehicle) {
         setVehicleToEdit(vehicle);
         setView('form');
     }
+};
     // Note: No need for an error if vehicle is undefined, as it will simply not navigate.
 };
 
@@ -285,22 +287,22 @@ const handleEditVehicle = (vehicleId: string) => {
                 return <Garage vehicles={vehicles} onSelectVehicle={handleSelectVehicle} onNavigateHome={() => navigate('home')} />;
             // App.tsx (Inside renderAppContent, inside the switch(view))
 // ...
-            case 'profile':
-                // FIX: Ensure vehicles is an array before searching for a vehicle to show
-                const vehicleToShow = pendingVehicle || (Array.isArray(vehicles) ? vehicles.find(v => v.id === selectedVehicleId) : undefined);
-                if (vehicleToShow) {
-                    return <VehicleProfile 
-                                vehicle={vehicleToShow} 
-                                isNewProfile={!!pendingVehicle}
-                                onSave={handleSaveVehicle}
-                                onDiscard={handleDiscardVehicle}
-                                onBackToGarage={() => navigate('garage')}
-                                onEdit={handleEditVehicle}
-                                onUpdateDescription={(newDescription) => handleUpdateVehicleDescription(vehicleToShow.id, newDescription)}
-                            />;
-                }
-                navigate('garage');
-                return null;
+         case 'profile':
+            // FIX: Defensive check before calling .find() when determining which vehicle to show.
+            const vehicleToShow = pendingVehicle || (Array.isArray(vehicles) ? vehicles.find(v => v.id === selectedVehicleId) : undefined);
+            if (vehicleToShow) {
+                return <VehicleProfile 
+                            vehicle={vehicleToShow} 
+                            isNewProfile={!!pendingVehicle}
+                            onSave={handleSaveVehicle}
+                            onDiscard={handleDiscardVehicle}
+                            onBackToGarage={() => navigate('garage')}
+                            onEdit={handleEditVehicle}
+                            onUpdateDescription={(newDescription) => handleUpdateVehicleDescription(vehicleToShow.id, newDescription)}
+                        />;
+            }
+            navigate('garage');
+            return null;
             default:
                 return <HomePage onNavigate={(page) => navigate(page)} />;
         }
