@@ -31,17 +31,21 @@ const Garage: React.FC<GarageProps> = ({ vehicles, onSelectVehicle, onNavigateHo
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {vehicles.map(vehicle => {
-                // CRITICAL FIX: Use || [] to default to an empty array if photos is undefined or null.
-                const firstPhoto = (vehicle.photos || []).find(p => p !== null);
+                // Get the first PhotoMetadata object, skipping nulls if any exist
+                const firstPhotoMetadata = (vehicle.photos || []).find(p => p !== null);
+                
+                // 💡 CRITICAL FIX: Extract the downloadURL string for the image src
+                const imageUrl = firstPhotoMetadata ? firstPhotoMetadata.downloadURL : null;
+
                 return (
                     <div 
                         key={vehicle.id} 
                         className="bg-gray-950/50 rounded-lg border border-gray-800 overflow-hidden cursor-pointer group transition-all duration-300 hover:border-orange-500 hover:scale-105"
                         onClick={() => onSelectVehicle(vehicle.id)}
                     >
-                        {firstPhoto ? (
+                        {imageUrl ? (
                              <img 
-                                src={firstPhoto} 
+                                src={imageUrl} // ⬅️ NOW PASSING THE STRING URL
                                 alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                                 className="w-full h-48 object-cover"
                             />
