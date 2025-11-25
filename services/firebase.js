@@ -3,17 +3,15 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage"; // <-- ADD THIS IMPORT
 
-// 1. Configuration relies on parsing a single JSON string from the environment.
-const configString = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
-let firebaseConfig = {};
-
-if (configString) {
-  try {
-    firebaseConfig = JSON.parse(configString);
-  } catch (e) {
-    console.error("FIREBASE CONFIG ERROR: Failed to parse NEXT_PUBLIC_FIREBASE_CONFIG JSON string.", e);
-  }
-}
+const firebaseConfig = {
+    // 💡 Must use the VITE_ prefix as defined on Vercel
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
 
 // Ensure the config has the minimum required information
 if (!firebaseConfig.apiKey) {
