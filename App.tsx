@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Vehicle, User, PhotoMetadata } from './types'; // 💡 Ensure PhotoMetadata is imported
+import { Vehicle, User, PhotoMetadata } from './types'; 
 import VehicleForm from './components/VehicleForm';
 import VehicleProfile from './components/VehicleProfile';
 import { generateDescriptionClient } from './services/geminiService';
@@ -12,7 +12,7 @@ import LogoutIcon from './components/icons/LogoutIcon';
 
 
 // --- FIREBASE IMPORTS ---
-// 💡 IMPORTANT: Ensure your firebase.ts exports 'storage'
+// IMPORTANT: Ensure your firebase.ts exports 'storage'
 import { auth, db, storage } from './services/firebase'; 
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { 
@@ -134,35 +134,50 @@ const App: React.FC = () => {
     };
 
     // -------------------------------------------------------------------------
-    // 5. FIREBASE STORAGE HELPER FUNCTION (NEW)
+    // 5. FIREBASE STORAGE HELPER FUNCTION (UPDATED FOR ERROR HANDLING)
     // -------------------------------------------------------------------------
 
-    const uploadBase64ToStorage = async (base64String: string, ownerId: string, index: number): Promise<PhotoMetadata> => {
-        if (!base64String || !ownerId) {
-            throw new Error("Invalid base64 string or owner ID for upload.");
+    const uploadBase64ToStorage = async (base64String: string, ownerId: string, index: number): Promise<PhotoMetadata | null> => {
+        
+        // 1. Guard against uninitialized storage
+        if (!storage) {
+            console.error("Firebase Storage service is not initialized.");
+            return null;
         }
-        
-        // 1. Create the Storage Reference
-        const fileName = `photo_${Date.now()}_${index}.jpg`;
-        const storagePath = `vehicles/${ownerId}/photos/${fileName}`;
-        const storageRef = ref(storage, storagePath);
 
-        // 2. Upload the Base64 String using 'data_url' format
-        await uploadString(storageRef, base64String, 'data_url');
-        
-        // 3. Get the Download URL
-        const downloadURL = await getDownloadURL(storageRef);
+        // 2. Guard against invalid input data (Base64 string or ID)
+        // We use a length check to filter out empty/malformed strings gracefully
+        if (!base64String || !ownerId || typeof base64String !== 'string' || base64String.length < 100) {
+            console.warn(`Skipping invalid/missing Base64 string or Owner ID at index ${index}.`);
+            return null;
+        }
 
-        // 4. Return the PhotoMetadata object
-        return { 
-            downloadURL: downloadURL,
-            path: storagePath,
-            fileName: fileName 
-        };
+        try {
+            // 3. Create the Storage Reference
+            const fileName = `photo_${Date.now()}_${index}.jpg`;
+            const storagePath = `vehicles/${ownerId}/photos/${fileName}`;
+            const storageRef = ref(storage, storagePath);
+
+            // 4. Upload the Base64 String using 'data_url' format
+            await uploadString(storageRef, base64String, 'data_url');
+            
+            // 5. Get the Download URL
+            const downloadURL = await getDownloadURL(storageRef);
+
+            // 6. Return the PhotoMetadata object
+            return { 
+                downloadURL: downloadURL,
+                path: storagePath,
+                fileName: fileName 
+            };
+        } catch (e) {
+            console.error(`Error uploading photo at index ${index}:`, e);
+            return null; // Return null on any upload failure
+        }
     };
 
     // -------------------------------------------------------------------------
-    // 6. FIRESTORE DATA HANDLER (UPDATED to include photo upload)
+    // 6. FIRESTORE DATA HANDLER (UPDATED to include photo upload/filtering)
     // -------------------------------------------------------------------------
     
     const handleFormSubmit = async (formData: Omit<Vehicle, 'description' | 'id' | 'createdAt'>) => {
@@ -206,7 +221,7 @@ const App: React.FC = () => {
             setIsLoading(true);
             setError(null);
 
-            // 1. Isolate the RAW Base64 data from the pending vehicle object (before destructuring)
+            // 1. Isolate the RAW Base64 data from the pending vehicle object
             const rawPhotos = (pendingVehicle as any).photos || [];
             const rawServicePhotos = (pendingVehicle as any).serviceHistoryPhotos || [];
 
@@ -227,11 +242,15 @@ const App: React.FC = () => {
                     uploadBase64ToStorage(base64String, currentUser!.uid, index + rawPhotos.length)
                 );
                 
-                // Wait for all uploads to complete
-                const photosMetadata = await Promise.all(photoUploadPromises);
-                const servicePhotosMetadata = await Promise.all(servicePhotoUploadPromises);
+                // Wait for all uploads to complete (some may resolve to null if invalid)
+                const photosMetadataRaw = await Promise.all(photoUploadPromises);
+                const servicePhotosMetadataRaw = await Promise.all(servicePhotoUploadPromises);
 
-                // 4. Prepare the final data for Firestore (now includes small URL arrays)
+                // 4. Filter out null results (invalid Base64 strings)
+                const photosMetadata = photosMetadataRaw.filter(meta => meta !== null) as PhotoMetadata[];
+                const servicePhotosMetadata = servicePhotosMetadataRaw.filter(meta => meta !== null) as PhotoMetadata[];
+
+                // 5. Prepare the final data for Firestore (now includes small URL arrays)
                 const vehicleData = {
                     ...restOfVehicleData, 
                     photos: photosMetadata, 
@@ -240,15 +259,15 @@ const App: React.FC = () => {
                     ownerId: currentUser.uid      
                 };
 
-                // 5. Save the document to Firestore
+                // 6. Save the document to Firestore
                 const docRef = doc(collection(db, 'vehicles'));
                 await setDoc(docRef, vehicleData);
                 
-                // 6. Update local state
+                // 7. Update local state
                 const vehicleWithId: Vehicle = {
                     ...pendingVehicle,
                     id: docRef.id, 
-                    photos: photosMetadata, // Use the new metadata for local state
+                    photos: photosMetadata, 
                     serviceHistoryPhotos: servicePhotosMetadata,
                     createdAt: new Date().toISOString()
                 };
@@ -259,7 +278,7 @@ const App: React.FC = () => {
                 
             } catch (error) {
                 console.error("Failed to save vehicle and upload photos:", error);
-                setError("Failed to save vehicle and upload photos. Please check Storage Rules."); 
+                setError("Failed to save vehicle and upload photos. Please ensure Storage Rules are published."); 
             } finally {
                 setIsLoading(false);
             }
@@ -287,7 +306,6 @@ const App: React.FC = () => {
             setView('form');
         }
     };
-    // Note: No need for an error if vehicle is undefined, as it will simply not navigate.
 
 
     const handleUpdateVehicleDescription = (vehicleId: string, newDescription: string) => {
