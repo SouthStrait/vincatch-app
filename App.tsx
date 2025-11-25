@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Vehicle, User } from './types'; 
+import { Vehicle, User, PhotoMetadata } from './types'; // 💡 Ensure PhotoMetadata is imported
 import VehicleForm from './components/VehicleForm';
 import VehicleProfile from './components/VehicleProfile';
 import { generateDescriptionClient } from './services/geminiService';
@@ -12,7 +12,8 @@ import LogoutIcon from './components/icons/LogoutIcon';
 
 
 // --- FIREBASE IMPORTS ---
-import { auth, db } from './services/firebase'; 
+// 💡 IMPORTANT: Ensure your firebase.ts exports 'storage'
+import { auth, db, storage } from './services/firebase'; 
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { 
     createUserWithEmailAndPassword, 
@@ -75,7 +76,7 @@ const App: React.FC = () => {
                             createdAt: (doc.data().createdAt?.toDate() || new Date()).toISOString(), 
                             ...doc.data() as Omit<Vehicle, 'id' | 'createdAt'>
                         }));
-                        setVehicles(loadedVehicles);
+                        setVehicles(loadedVehicles as Vehicle[]);
                     } catch (error) {
                         console.error("Could not load vehicles from Firestore", error);
                         setError("Failed to load vehicle data.");
@@ -133,7 +134,35 @@ const App: React.FC = () => {
     };
 
     // -------------------------------------------------------------------------
-    // 5. FIRESTORE DATA HANDLER (handleSaveVehicle updated to fix 1MB limit)
+    // 5. FIREBASE STORAGE HELPER FUNCTION (NEW)
+    // -------------------------------------------------------------------------
+
+    const uploadBase64ToStorage = async (base64String: string, ownerId: string, index: number): Promise<PhotoMetadata> => {
+        if (!base64String || !ownerId) {
+            throw new Error("Invalid base64 string or owner ID for upload.");
+        }
+        
+        // 1. Create the Storage Reference
+        const fileName = `photo_${Date.now()}_${index}.jpg`;
+        const storagePath = `vehicles/${ownerId}/photos/${fileName}`;
+        const storageRef = ref(storage, storagePath);
+
+        // 2. Upload the Base64 String using 'data_url' format
+        await uploadString(storageRef, base64String, 'data_url');
+        
+        // 3. Get the Download URL
+        const downloadURL = await getDownloadURL(storageRef);
+
+        // 4. Return the PhotoMetadata object
+        return { 
+            downloadURL: downloadURL,
+            path: storagePath,
+            fileName: fileName 
+        };
+    };
+
+    // -------------------------------------------------------------------------
+    // 6. FIRESTORE DATA HANDLER (UPDATED to include photo upload)
     // -------------------------------------------------------------------------
     
     const handleFormSubmit = async (formData: Omit<Vehicle, 'description' | 'id' | 'createdAt'>) => {
@@ -143,6 +172,7 @@ const App: React.FC = () => {
             const description = await generateDescriptionClient(formData);
             
             if (vehicleToEdit) {
+                // If editing, we skip re-uploading photos unless the form explicitly changed them
                 const updatedVehicle: Vehicle = {
                     ...vehicleToEdit,
                     ...formData,
@@ -153,7 +183,7 @@ const App: React.FC = () => {
                 setVehicleToEdit(null);
                 setView('profile');
             } else {
-                // Assuming photoData is added by a separate component before save
+                // If new vehicle, create pending vehicle with generated description
                 const newVehicle: PendingVehicle = { 
                     ...formData, 
                     id: `${Date.now()}-${formData.vin}`,
@@ -171,45 +201,71 @@ const App: React.FC = () => {
         }
     };
     
-const handleSaveVehicle = async () => { 
-    if (pendingVehicle && currentUser?.uid) {
-        setIsLoading(true);
-        try {
-            // CRITICAL FIX: Destructure the object to exclude all large data fields 
-            // defined in your types.ts (photos and serviceHistoryPhotos).
-            const { id, photos, serviceHistoryPhotos, ...restOfVehicleData } = pendingVehicle as any;
+    const handleSaveVehicle = async () => { 
+        if (pendingVehicle && currentUser?.uid) {
+            setIsLoading(true);
+            setError(null);
 
-            // Prepare the data for Firestore (now guaranteed to be < 1MB)
-            const vehicleData = {
-                ...restOfVehicleData, 
-                createdAt: serverTimestamp(), 
-                ownerId: currentUser.uid      
-            };
+            // 1. Isolate the RAW Base64 data from the pending vehicle object (before destructuring)
+            const rawPhotos = (pendingVehicle as any).photos || [];
+            const rawServicePhotos = (pendingVehicle as any).serviceHistoryPhotos || [];
 
-            // Save to Firestore
-            const docRef = doc(collection(db, 'vehicles'));
-            await setDoc(docRef, vehicleData);
-            
-            // Update local state (including the necessary fields we excluded, as they are needed for the UI display)
-            const vehicleWithId: Vehicle = {
-                ...pendingVehicle,
-                id: docRef.id, 
-                createdAt: new Date().toISOString()
-            };
-            
-            setVehicles(prev => [...prev, vehicleWithId]);
-            setPendingVehicle(null);
-            setView('garage');
-            
-        } catch (error) {
-            console.error("Failed to save vehicle to Firestore:", error);
-            // We can now assume any remaining error is a genuine network or rule issue.
-            setError("Failed to save vehicle data."); 
-        } finally {
-            setIsLoading(false);
+            // 2. Destructure the object to exclude large raw fields from Firestore data
+            const { 
+                id, 
+                photos: excludedRawPhotos, // Exclude the raw Base64 strings
+                serviceHistoryPhotos: excludedRawServicePhotos, 
+                ...restOfVehicleData 
+            } = pendingVehicle as any;
+
+            try {
+                // 3. Upload all raw photos to Firebase Storage in parallel
+                const photoUploadPromises = rawPhotos.map((base64String: string, index: number) => 
+                    uploadBase64ToStorage(base64String, currentUser!.uid, index)
+                );
+                const servicePhotoUploadPromises = rawServicePhotos.map((base64String: string, index: number) => 
+                    uploadBase64ToStorage(base64String, currentUser!.uid, index + rawPhotos.length)
+                );
+                
+                // Wait for all uploads to complete
+                const photosMetadata = await Promise.all(photoUploadPromises);
+                const servicePhotosMetadata = await Promise.all(servicePhotoUploadPromises);
+
+                // 4. Prepare the final data for Firestore (now includes small URL arrays)
+                const vehicleData = {
+                    ...restOfVehicleData, 
+                    photos: photosMetadata, 
+                    serviceHistoryPhotos: servicePhotosMetadata, 
+                    createdAt: serverTimestamp(), 
+                    ownerId: currentUser.uid      
+                };
+
+                // 5. Save the document to Firestore
+                const docRef = doc(collection(db, 'vehicles'));
+                await setDoc(docRef, vehicleData);
+                
+                // 6. Update local state
+                const vehicleWithId: Vehicle = {
+                    ...pendingVehicle,
+                    id: docRef.id, 
+                    photos: photosMetadata, // Use the new metadata for local state
+                    serviceHistoryPhotos: servicePhotosMetadata,
+                    createdAt: new Date().toISOString()
+                };
+                
+                setVehicles(prev => [...prev, vehicleWithId]);
+                setPendingVehicle(null);
+                setView('garage');
+                
+            } catch (error) {
+                console.error("Failed to save vehicle and upload photos:", error);
+                setError("Failed to save vehicle and upload photos. Please check Storage Rules."); 
+            } finally {
+                setIsLoading(false);
+            }
         }
-    }
-};
+    };
+
 
     const handleDiscardVehicle = () => {
         setPendingVehicle(null);
@@ -222,17 +278,15 @@ const handleSaveVehicle = async () => {
         setView('profile');
     };
     
-// App.tsx (Replace the existing handleEditVehicle function)
-
-const handleEditVehicle = (vehicleId: string) => {
-    // FIX: Ensure vehicles is an array before calling find()
-    const vehicle = Array.isArray(vehicles) ? vehicles.find(v => v.id === vehicleId) : undefined;
-    
-    if (vehicle) {
-        setVehicleToEdit(vehicle);
-        setView('form');
-    }
-};
+    const handleEditVehicle = (vehicleId: string) => {
+        // FIX: Ensure vehicles is an array before calling find()
+        const vehicle = Array.isArray(vehicles) ? vehicles.find(v => v.id === vehicleId) : undefined;
+        
+        if (vehicle) {
+            setVehicleToEdit(vehicle);
+            setView('form');
+        }
+    };
     // Note: No need for an error if vehicle is undefined, as it will simply not navigate.
 
 
@@ -285,24 +339,23 @@ const handleEditVehicle = (vehicleId: string) => {
                 return <VehicleForm onSubmit={handleFormSubmit} initialData={vehicleToEdit} />;
             case 'garage':
                 return <Garage vehicles={vehicles} onSelectVehicle={handleSelectVehicle} onNavigateHome={() => navigate('home')} />;
-            // App.tsx (Inside renderAppContent, inside the switch(view))
-// ...
-         case 'profile':
-            // FIX: Defensive check before calling .find() when determining which vehicle to show.
-            const vehicleToShow = pendingVehicle || (Array.isArray(vehicles) ? vehicles.find(v => v.id === selectedVehicleId) : undefined);
-            if (vehicleToShow) {
-                return <VehicleProfile 
-                            vehicle={vehicleToShow} 
-                            isNewProfile={!!pendingVehicle}
-                            onSave={handleSaveVehicle}
-                            onDiscard={handleDiscardVehicle}
-                            onBackToGarage={() => navigate('garage')}
-                            onEdit={handleEditVehicle}
-                            onUpdateDescription={(newDescription) => handleUpdateVehicleDescription(vehicleToShow.id, newDescription)}
-                        />;
-            }
-            navigate('garage');
-            return null;
+            
+            case 'profile':
+                // FIX: Defensive check before calling .find() when determining which vehicle to show.
+                const vehicleToShow = pendingVehicle || (Array.isArray(vehicles) ? vehicles.find(v => v.id === selectedVehicleId) : undefined);
+                if (vehicleToShow) {
+                    return <VehicleProfile 
+                                vehicle={vehicleToShow} 
+                                isNewProfile={!!pendingVehicle}
+                                onSave={handleSaveVehicle}
+                                onDiscard={handleDiscardVehicle}
+                                onBackToGarage={() => navigate('garage')}
+                                onEdit={handleEditVehicle}
+                                onUpdateDescription={(newDescription) => handleUpdateVehicleDescription(vehicleToShow.id, newDescription)}
+                            />;
+                }
+                navigate('garage');
+                return null;
             default:
                 return <HomePage onNavigate={(page) => navigate(page)} />;
         }

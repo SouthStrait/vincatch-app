@@ -3,6 +3,12 @@ export interface User {
   email: string;
 }
 
+export interface PhotoMetadata {
+    downloadURL: string;
+    path: string; // The path in Firebase Storage (optional but useful)
+    fileName: string; // Original file name
+}
+
 export interface Vehicle {
   id: string;
   vin: string;
@@ -23,8 +29,9 @@ export interface Vehicle {
   fuelType: string;
   features: string[];
   serviceHistory: string;
-  photos: (string | null)[]; // Array of base64 encoded image strings, nulls preserve slot index
-  serviceHistoryPhotos: string[]; // Array of base64 encoded image strings for service records
+  photos: PhotoMetadata[]; 
+  serviceHistoryPhotos: PhotoMetadata[];
   description: string;
   createdAt: string; // ISO 8601 date string
 }
+
