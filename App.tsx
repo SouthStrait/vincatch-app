@@ -137,44 +137,75 @@ const App: React.FC = () => {
     // 5. FIREBASE STORAGE HELPER FUNCTION (UPDATED FOR ERROR HANDLING)
     // -------------------------------------------------------------------------
 
-    const uploadBase64ToStorage = async (base64String: string, ownerId: string, index: number): Promise<PhotoMetadata | null> => {
+    // App.tsx (Inside const App: React.FC = () => { ... })
+
+const uploadBase64ToStorage = async (base64String: string, ownerId: string, index: number): Promise<PhotoMetadata | null> => {
+    
+    if (!storage) {
+        console.error("Firebase Storage service is not initialized.");
+        return null;
+    }
+
+    // 1. Robust Guard Check
+    if (!base64String || !ownerId || typeof base64String !== 'string' || base64String.length < 100) {
+        console.warn(`Skipping invalid/missing Base64 string or Owner ID at index ${index}.`);
+        return null;
+    }
+
+    try {
+        // 2. Extract MIME Type and Data
+        // Find the start and end of the MIME type (e.g., "application/pdf" or "image/jpeg")
+        const mimeTypeMatch = base64String.match(/^data:(.*?);base64,/);
         
-        // 1. Guard against uninitialized storage
-        if (!storage) {
-            console.error("Firebase Storage service is not initialized.");
-            return null;
-        }
+        // Use a generic extension and content type if parsing fails
+        let mimeType = 'image/jpeg';
+        let fileExtension = 'jpg';
 
-        // 2. Guard against invalid input data (Base64 string or ID)
-        // We use a length check to filter out empty/malformed strings gracefully
-        if (!base64String || !ownerId || typeof base64String !== 'string' || base64String.length < 100) {
-            console.warn(`Skipping invalid/missing Base64 string or Owner ID at index ${index}.`);
-            return null;
-        }
-
-        try {
-            // 3. Create the Storage Reference
-            const fileName = `photo_${Date.now()}_${index}.jpg`;
-            const storagePath = `vehicles/${ownerId}/photos/${fileName}`;
-            const storageRef = ref(storage, storagePath);
-
-            // 4. Upload the Base64 String using 'data_url' format
-            await uploadString(storageRef, base64String, 'data_url');
+        if (mimeTypeMatch && mimeTypeMatch[1]) {
+            mimeType = mimeTypeMatch[1];
             
-            // 5. Get the Download URL
-            const downloadURL = await getDownloadURL(storageRef);
-
-            // 6. Return the PhotoMetadata object
-            return { 
-                downloadURL: downloadURL,
-                path: storagePath,
-                fileName: fileName 
-            };
-        } catch (e) {
-            console.error(`Error uploading photo at index ${index}:`, e);
-            return null; // Return null on any upload failure
+            // Set file extension based on MIME type for better organization in Storage
+            if (mimeType.includes('pdf')) {
+                fileExtension = 'pdf';
+            } else if (mimeType.includes('png')) {
+                fileExtension = 'png';
+            } else if (mimeType.includes('gif')) {
+                fileExtension = 'gif';
+            }
+            // Defaults to jpg if image/* is found but not specific, or if mimeType is unknown
         }
-    };
+
+        // 3. Create the Storage Reference with the correct file extension
+        const fileName = `document_${Date.now()}_${index}.${fileExtension}`;
+        
+        // Use a general 'files' folder if the document is a service record
+        const isPhoto = mimeType.startsWith('image/');
+        const storagePath = isPhoto 
+            ? `vehicles/${ownerId}/photos/${fileName}` 
+            : `vehicles/${ownerId}/service_records/${fileName}`;
+
+        const storageRef = ref(storage, storagePath);
+
+        // 4. Upload the Base64 String using 'data_url' format
+        // Firebase handles the 'data:mime/type;base64,data' format correctly
+        await uploadString(storageRef, base64String, 'data_url');
+        
+        // 5. Get the Download URL
+        const downloadURL = await getDownloadURL(storageRef);
+
+        // 6. Return the PhotoMetadata object
+        return { 
+            downloadURL: downloadURL,
+            path: storagePath,
+            fileName: fileName 
+        };
+        
+    } catch (e) {
+        console.error(`Error uploading file at index ${index}:`, e);
+        // The error is likely here if it still fails. Return null gracefully.
+        return null;
+    }
+};
 
     // -------------------------------------------------------------------------
     // 6. FIRESTORE DATA HANDLER (UPDATED to include photo upload/filtering)
