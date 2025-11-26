@@ -181,9 +181,18 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
                                         </div>
                                     </a>
                                 );
-                            } else {
+} else {
+                                // FIXED: Added the 'download' attribute here.
+                                // We use a generic filename 'document.pdf' or similar.
                                 return (
-                                    <a href={dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="group relative aspect-square bg-gray-800 rounded-lg border border-gray-700 flex flex-col items-center justify-center p-2 text-center transition-all hover:bg-gray-700">
+                                    <a 
+                                        href={dataUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        key={index} 
+                                        download={`service-document-${index + 1}.pdf`} // <--- THIS IS THE KEY FIX
+                                        className="group relative aspect-square bg-gray-800 rounded-lg border border-gray-700 flex flex-col items-center justify-center p-2 text-center transition-all hover:bg-gray-700"
+                                    >
                                         <DocumentTextIcon className="h-12 w-12 text-neutral-400" />
                                         <p className="text-xs text-neutral-300 mt-2">Document {index + 1}</p>
                                     </a>
