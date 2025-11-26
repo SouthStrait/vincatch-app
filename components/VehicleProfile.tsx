@@ -147,11 +147,19 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
         return null;
     }
 
+    // Function to handle opening the Data URL in a new tab via JS
+    const handleDocumentClick = (dataUrl: string) => (event: React.MouseEvent) => {
+        // Prevent the default browser navigation which is getting blocked
+        event.preventDefault(); 
+        
+        // Use window.open to bypass the top-frame navigation restriction
+        window.open(dataUrl, '_blank');
+    };
+
     return (
         <>
             {/* Service History Notes */}
             {vehicle.serviceHistory && (
-                // ... (History Note content remains the same)
                 <div className="bg-gray-900 p-4 rounded-lg border border-gray-800">
                     <h3 className="text-xl font-semibold text-neutral-200 mb-3 flex items-center">
                         <WrenchIcon className="h-6 w-6" /> <span className="ml-2">Service History & Notes</span>
@@ -184,15 +192,14 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
                                     </a>
                                 );
                             } else {
-                                // For PDFs (and other non-image files), we REMOVE the 'download' attribute.
-                                // The browser will default to opening the Data URL in the new tab (target="_blank").
-                                // If the Data URL is a PDF, the browser's native PDF viewer will open it.
+                                // PDF/Document link (Uses the new onClick handler)
                                 return (
                                     <a 
                                         href={dataUrl} 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
                                         key={index} 
+                                        onClick={handleDocumentClick(dataUrl)}
                                         className="group relative aspect-square bg-gray-800 rounded-lg border border-gray-700 flex flex-col items-center justify-center p-2 text-center transition-all hover:bg-gray-700"
                                     >
                                         <DocumentTextIcon className="h-12 w-12 text-neutral-400" />
