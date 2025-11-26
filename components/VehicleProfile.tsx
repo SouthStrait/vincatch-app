@@ -151,6 +151,7 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
         <>
             {/* Service History Notes */}
             {vehicle.serviceHistory && (
+                // ... (History Note content remains the same)
                 <div className="bg-gray-900 p-4 rounded-lg border border-gray-800">
                     <h3 className="text-xl font-semibold text-neutral-200 mb-3 flex items-center">
                         <WrenchIcon className="h-6 w-6" /> <span className="ml-2">Service History & Notes</span>
@@ -166,6 +167,7 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         {vehicle.serviceHistoryPhotos.map((dataUrl, index) => {
                             const mimeType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
+                            
                             if (mimeType.startsWith('image/')) {
                                 return (
                                     <a href={dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="group relative aspect-square">
@@ -181,16 +183,16 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
                                         </div>
                                     </a>
                                 );
-} else {
-                                // FIXED: Added the 'download' attribute here.
-                                // We use a generic filename 'document.pdf' or similar.
+                            } else {
+                                // For PDFs (and other non-image files), we REMOVE the 'download' attribute.
+                                // The browser will default to opening the Data URL in the new tab (target="_blank").
+                                // If the Data URL is a PDF, the browser's native PDF viewer will open it.
                                 return (
                                     <a 
                                         href={dataUrl} 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
                                         key={index} 
-                                        download={`service-document-${index + 1}.pdf`} // <--- THIS IS THE KEY FIX
                                         className="group relative aspect-square bg-gray-800 rounded-lg border border-gray-700 flex flex-col items-center justify-center p-2 text-center transition-all hover:bg-gray-700"
                                     >
                                         <DocumentTextIcon className="h-12 w-12 text-neutral-400" />
