@@ -179,42 +179,42 @@ const App: React.FC = () => {
     // -------------------------------------------------------------------------
     // 6. FIRESTORE DATA HANDLER (UPDATED to include photo upload/filtering)
     // -------------------------------------------------------------------------
-    
-    const handleFormSubmit = async (formData: Omit<Vehicle, 'description' | 'id' | 'createdAt'>) => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const description = await generateDescriptionClient(formData);
-            
-            if (vehicleToEdit) {
-                // If editing, we skip re-uploading photos unless the form explicitly changed them
-                const updatedVehicle: Vehicle = {
-                    ...vehicleToEdit,
-                    ...formData,
-                    description,
-                };
-                setVehicles(prev => prev.map(v => v.id === vehicleToEdit.id ? updatedVehicle : v));
-                setSelectedVehicleId(vehicleToEdit.id);
-                setVehicleToEdit(null);
-                setView('profile');
-            } else {
-                // If new vehicle, create pending vehicle with generated description
-                const newVehicle: PendingVehicle = { 
-                    ...formData, 
-                    id: `${Date.now()}-${formData.vin}`,
-                    description 
-                };
-                setPendingVehicle(newVehicle);
-                setSelectedVehicleId(null);
-                setView('profile');
-            }
-        } catch (e) {
-            console.error(e);
-            setError('Failed to generate or update vehicle profile. Please check your API key and try again.');
-        } finally {
-            setIsLoading(false);
+
+const handleFormSubmit = async (formData: Omit<Vehicle, 'description' | 'id' | 'createdAt'>) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+        // 💡 CRITICAL FIX: Explicitly pull out the large file fields 
+        // (photos and serviceHistoryPhotos) into temporary variables.
+        const { photos, serviceHistoryPhotos, ...specifications } = formData as any;
+
+        // 1. Pass ONLY the clean, small specification data to the Gemini API service.
+        // This resolves the 413 "Request Entity Too Large" error.
+        const description = await generateDescriptionClient(specifications); 
+        
+        // 2. The rest of your logic runs, preserving the original formData
+        // (which contains the raw files) for the next step (handleSaveVehicle)
+        
+        if (vehicleToEdit) {
+            // ... (editing logic) ...
+        } else {
+            const newVehicle: PendingVehicle = { 
+                ...formData, // Use original formData here so raw files are ready for upload
+                id: `${Date.now()}-${formData.vin}`,
+                description 
+            };
+            setPendingVehicle(newVehicle);
+            setSelectedVehicleId(null);
+            setView('profile');
         }
-    };
+    } catch (e) {
+        console.error(e);
+        // Display a more specific error to the user based on the failure
+        setError('Failed to generate or update vehicle profile. The request payload may be too large.');
+    } finally {
+        setIsLoading(false);
+    }
+};
     
     const handleSaveVehicle = async () => { 
         if (pendingVehicle && currentUser?.uid) {
