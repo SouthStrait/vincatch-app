@@ -139,6 +139,8 @@ const App: React.FC = () => {
 
     // App.tsx (Inside const App: React.FC = () => { ... })
 
+// App.tsx (Inside const App: React.FC = () => { ... })
+
 const uploadBase64ToStorage = async (base64String: string, ownerId: string, index: number): Promise<PhotoMetadata | null> => {
     
     if (!storage) {
@@ -154,12 +156,10 @@ const uploadBase64ToStorage = async (base64String: string, ownerId: string, inde
 
     try {
         // 2. Extract MIME Type and Data
-        // Find the start and end of the MIME type (e.g., "application/pdf" or "image/jpeg")
         const mimeTypeMatch = base64String.match(/^data:(.*?);base64,/);
         
-        // Use a generic extension and content type if parsing fails
-        let mimeType = 'image/jpeg';
-        let fileExtension = 'jpg';
+        let mimeType = 'application/octet-stream'; // Default generic type
+        let fileExtension = 'bin';
 
         if (mimeTypeMatch && mimeTypeMatch[1]) {
             mimeType = mimeTypeMatch[1];
@@ -171,29 +171,41 @@ const uploadBase64ToStorage = async (base64String: string, ownerId: string, inde
                 fileExtension = 'png';
             } else if (mimeType.includes('gif')) {
                 fileExtension = 'gif';
+            } 
+            // 💡 IMAGE FIX: Ensure common image types are handled, defaulting to jpeg
+            else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) {
+                fileExtension = 'jpg';
+            } else if (mimeType.startsWith('image/')) {
+                fileExtension = mimeType.split('/')[1] || 'dat'; 
             }
-            // Defaults to jpg if image/* is found but not specific, or if mimeType is unknown
         }
 
         // 3. Create the Storage Reference with the correct file extension
         const fileName = `document_${Date.now()}_${index}.${fileExtension}`;
         
-        // Use a general 'files' folder if the document is a service record
+        // Use separate folders for photos and service records
         const isPhoto = mimeType.startsWith('image/');
-        const storagePath = isPhoto 
-            ? `vehicles/${ownerId}/photos/${fileName}` 
-            : `vehicles/${ownerId}/service_records/${fileName}`;
+        const folderName = isPhoto ? 'photos' : 'service_records';
+        const storagePath = `vehicles/${ownerId}/${folderName}/${fileName}`;
+
+        // 4. Set Metadata (CRITICAL for PDF viewing)
+        const metadata = {
+            contentType: mimeType, // Use the extracted MIME type
+            // 💡 PDF VIEWING FIX: Ensure Content-Disposition is NOT 'attachment' to encourage viewing
+            customMetadata: { 
+                viewable: 'true' 
+            }
+        };
 
         const storageRef = ref(storage, storagePath);
 
-        // 4. Upload the Base64 String using 'data_url' format
-        // Firebase handles the 'data:mime/type;base64,data' format correctly
-        await uploadString(storageRef, base64String, 'data_url');
+        // 5. Upload the Base64 String using 'data_url' format, including metadata
+        await uploadString(storageRef, base64String, 'data_url', metadata); // Pass the metadata here
         
-        // 5. Get the Download URL
+        // 6. Get the Download URL
         const downloadURL = await getDownloadURL(storageRef);
 
-        // 6. Return the PhotoMetadata object
+        // 7. Return the PhotoMetadata object
         return { 
             downloadURL: downloadURL,
             path: storagePath,
@@ -202,7 +214,6 @@ const uploadBase64ToStorage = async (base64String: string, ownerId: string, inde
         
     } catch (e) {
         console.error(`Error uploading file at index ${index}:`, e);
-        // The error is likely here if it still fails. Return null gracefully.
         return null;
     }
 };
