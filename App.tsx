@@ -162,23 +162,26 @@ const uploadBase64ToStorage = async (base64String: string, ownerId: string, inde
         let fileExtension = 'bin';
 
         if (mimeTypeMatch && mimeTypeMatch[1]) {
-            mimeType = mimeTypeMatch[1];
-            
-            // Set file extension based on MIME type for better organization in Storage
-            if (mimeType.includes('pdf')) {
-                fileExtension = 'pdf';
-            } else if (mimeType.includes('png')) {
-                fileExtension = 'png';
-            } else if (mimeType.includes('gif')) {
-                fileExtension = 'gif';
-            } 
-            // 💡 IMAGE FIX: Ensure common image types are handled, defaulting to jpeg
-            else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) {
-                fileExtension = 'jpg';
-            } else if (mimeType.startsWith('image/')) {
-                fileExtension = mimeType.split('/')[1] || 'dat'; 
-            }
+    mimeType = mimeTypeMatch[1];
+    
+    // Set file extension based on MIME type
+    if (mimeType.includes('pdf')) {
+        fileExtension = 'pdf';
+    } else if (mimeType.startsWith('image/')) {
+        // 💡 NEW IMAGE LOGIC: If it's any kind of image, ensure extension is set.
+        if (mimeType.includes('png')) {
+            fileExtension = 'png';
+        } else if (mimeType.includes('gif')) {
+            fileExtension = 'gif';
+        } else {
+            // Default to jpg for all other generic image types (most common fallback)
+            fileExtension = 'jpg';
         }
+    } else {
+        // Fallback for non-image/non-pdf (general document type)
+        fileExtension = 'dat'; 
+    }
+}
 
         // 3. Create the Storage Reference with the correct file extension
         const fileName = `document_${Date.now()}_${index}.${fileExtension}`;
