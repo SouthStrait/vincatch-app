@@ -147,37 +147,30 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
         return null;
     }
 
-    // REVISED FUNCTION: Force download by creating a temporary link
+    // Function to handle opening the Data URL (force download)
     const handleDocumentClick = (dataUrl: string, index: number) => (event: React.MouseEvent) => {
-        event.preventDefault(); // Stop default navigation
+        event.preventDefault();
 
         try {
-            // 1. Create a temporary anchor element
             const link = document.createElement('a');
-            
-            // 2. Set the Data URL as the source
             link.href = dataUrl;
-            
-            // 3. Set the 'download' attribute to force a download and suggest a filename
-            // We'll give it a dynamic name like 'service_record_1.pdf'
             link.download = `service_record_${index + 1}.pdf`; 
-            
-            // 4. Append the link to the body (necessary for Firefox and some other browsers)
             document.body.appendChild(link);
-            
-            // 5. Programmatically click the link to trigger the download
             link.click();
-            
-            // 6. Clean up the temporary link element
             document.body.removeChild(link);
             
         } catch (e) {
-            // Fallback: If programmatic download fails (e.g., extreme security settings),
-            // try the window.open method as a last resort.
             console.error("Force download failed, attempting window.open fallback:", e);
             window.open(dataUrl, '_blank');
         }
     };
+
+    // Filter the photos array to remove any null, undefined, or empty string entries
+    const safeServicePhotos = vehicle.serviceHistoryPhotos ? vehicle.serviceHistoryPhotos.filter(photo => typeof photo === 'string' && photo.length > 0) : [];
+    
+    // Check if we have any valid documents left to show
+    const shouldRenderDocuments = safeServicePhotos.length > 0;
+
 
     return (
         <>
@@ -192,43 +185,35 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
             )}
 
             {/* Service Documents/Photos */}
-            {vehicle.serviceHistoryPhotos && vehicle.serviceHistoryPhotos.length > 0 && (
+            {shouldRenderDocuments && ( // Use the new boolean check
                 <div className="bg-gray-900 p-4 rounded-lg border border-gray-800">
                     <h3 className="text-xl font-semibold text-neutral-200 mb-3">Service Records & Documents</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {vehicle.serviceHistoryPhotos.map((dataUrl, index) => {
+                        {safeServicePhotos.map((dataUrl, index) => { // Map over the SAFE array
+                            // A final safety check before using string methods
+                            if (typeof dataUrl !== 'string') return null;
+                            
                             const mimeType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
                             
                             if (mimeType.startsWith('image/')) {
-                                // Image handling (no change)
+                                // Image rendering logic...
                                 return (
                                     <a href={dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="group relative aspect-square">
-                                        <img 
-                                            src={dataUrl} 
-                                            alt={`Service document ${index + 1}`} 
-                                            className="rounded-lg object-cover w-full h-full transition-transform duration-300 group-hover:scale-105 border border-gray-800"
-                                        />
-                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 flex items-center justify-center rounded-lg">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" />
-                                            </svg>
-                                        </div>
+                                        {/* ... (rest of image rendering code) ... */}
                                     </a>
                                 );
                             } else {
-                                // PDF/Document link (Uses the force download handler)
+                                // PDF/Document rendering logic...
                                 return (
                                     <a 
-                                        href={dataUrl} // Kept for accessibility/fallback, but will be prevented
+                                        href={dataUrl} 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
                                         key={index} 
-                                        // Pass both the dataUrl and the index to the handler
-                                        onClick={handleDocumentClick(dataUrl, index)} 
+                                        onClick={handleDocumentClick(dataUrl, index)}
                                         className="group relative aspect-square bg-gray-800 rounded-lg border border-gray-700 flex flex-col items-center justify-center p-2 text-center transition-all hover:bg-gray-700"
                                     >
-                                        <DocumentTextIcon className="h-12 w-12 text-neutral-400" />
-                                        <p className="text-xs text-neutral-300 mt-2">Document {index + 1}</p>
+                                        {/* ... (rest of document rendering code) ... */}
                                     </a>
                                 );
                             }
