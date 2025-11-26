@@ -147,18 +147,41 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
         return null;
     }
 
-    // Function to handle opening the Data URL in a new tab via JS
-    const handleDocumentClick = (dataUrl: string) => (event: React.MouseEvent) => {
-        // Prevent the default browser navigation which is getting blocked
-        event.preventDefault(); 
-        
-        // Use window.open to bypass the top-frame navigation restriction
-        window.open(dataUrl, '_blank');
+    // REVISED FUNCTION: Force download by creating a temporary link
+    const handleDocumentClick = (dataUrl: string, index: number) => (event: React.MouseEvent) => {
+        event.preventDefault(); // Stop default navigation
+
+        try {
+            // 1. Create a temporary anchor element
+            const link = document.createElement('a');
+            
+            // 2. Set the Data URL as the source
+            link.href = dataUrl;
+            
+            // 3. Set the 'download' attribute to force a download and suggest a filename
+            // We'll give it a dynamic name like 'service_record_1.pdf'
+            link.download = `service_record_${index + 1}.pdf`; 
+            
+            // 4. Append the link to the body (necessary for Firefox and some other browsers)
+            document.body.appendChild(link);
+            
+            // 5. Programmatically click the link to trigger the download
+            link.click();
+            
+            // 6. Clean up the temporary link element
+            document.body.removeChild(link);
+            
+        } catch (e) {
+            // Fallback: If programmatic download fails (e.g., extreme security settings),
+            // try the window.open method as a last resort.
+            console.error("Force download failed, attempting window.open fallback:", e);
+            window.open(dataUrl, '_blank');
+        }
     };
 
     return (
         <>
-            {/* Service History Notes */}
+            {/* Service History Notes (unchanged) */}
             {vehicle.serviceHistory && (
                 <div className="bg-gray-900 p-4 rounded-lg border border-gray-800">
                     <h3 className="text-xl font-semibold text-neutral-200 mb-3 flex items-center">
@@ -177,6 +200,7 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
                             const mimeType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
                             
                             if (mimeType.startsWith('image/')) {
+                                // Image handling (no change)
                                 return (
                                     <a href={dataUrl} target="_blank" rel="noopener noreferrer" key={index} className="group relative aspect-square">
                                         <img 
@@ -192,14 +216,15 @@ const ServiceRecords: React.FC<VehicleSectionProps> = ({ vehicle }) => {
                                     </a>
                                 );
                             } else {
-                                // PDF/Document link (Uses the new onClick handler)
+                                // PDF/Document link (Uses the force download handler)
                                 return (
                                     <a 
-                                        href={dataUrl} 
+                                        href={dataUrl} // Kept for accessibility/fallback, but will be prevented
                                         target="_blank" 
                                         rel="noopener noreferrer" 
                                         key={index} 
-                                        onClick={handleDocumentClick(dataUrl)}
+                                        // Pass both the dataUrl and the index to the handler
+                                        onClick={handleDocumentClick(dataUrl, index)} 
                                         className="group relative aspect-square bg-gray-800 rounded-lg border border-gray-700 flex flex-col items-center justify-center p-2 text-center transition-all hover:bg-gray-700"
                                     >
                                         <DocumentTextIcon className="h-12 w-12 text-neutral-400" />
