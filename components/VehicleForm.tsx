@@ -671,3 +671,105 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, initialData }) => {
             </div>
 
             <div className={step === 4 ? 'animate-fade-in' : 'hidden'}>
+              <section>
+                    <h2 className="text-2xl font-bold mb-6 text-neutral-200 border-b border-gray-700 pb-3">Service History & Notes</h2>
+                    <div>
+                        <label htmlFor="serviceHistory" className="block text-sm font-medium text-neutral-300 mb-2">
+                            Describe any recent service, known issues, or key selling points.
+                        </label>
+                        <textarea
+                            id="serviceHistory"
+                            name="serviceHistory"
+                            value={formData.serviceHistory}
+                            onChange={handleChange}
+                            rows={8}
+                            className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-neutral-200 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition duration-200"
+                            placeholder="e.g., New tires installed at 120,000 km. Regular oil changes every 5,000 km. Small scratch on rear bumper."
+                        />
+                    </div>
+                    <div className="mt-6">
+                        <label className="block text-sm font-medium text-neutral-300 mb-2">Upload Service Records (Optional)</label>
+                        <div className="mt-2 flex justify-center rounded-lg border border-dashed border-gray-700 px-6 py-10 hover:border-orange-500 transition-colors">
+                            <div className="text-center">
+                                <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-500" />
+                                <div className="mt-4 flex text-sm leading-6 text-neutral-400">
+                                    <label
+                                        htmlFor="service-file-upload"
+                                        className="relative cursor-pointer rounded-md bg-gray-900 font-semibold text-orange-400 focus-within:outline-none focus-within:ring-2 focus-within:ring-orange-600 focus-within:ring-offset-2 focus-within:ring-offset-gray-950 hover:text-orange-500"
+                                    >
+                                        <span>Upload files</span>
+                                        <input id="service-file-upload" name="service-file-upload" type="file" className="sr-only" multiple onChange={handleServiceHistoryPhotoChange} accept="image/*,.pdf,.doc,.docx" />
+                                    </label>
+                                    <p className="pl-1">or drag and drop</p>
+                                </div>
+                                <p className="text-xs leading-5 text-gray-500">Images, PDF, DOCX up to 10MB each</p>
+                            </div>
+                        </div>
+                    </div>
+                    {serviceHistoryPhotos.length > 0 && (
+                        <div className="mt-4">
+                            <p className="text-sm font-medium text-neutral-300">Uploaded files:</p>
+                            <ul className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {serviceHistoryPhotos.map((photo, index) => (
+                                    <li key={index} className="relative group aspect-square bg-gray-950 border border-gray-800 rounded-lg p-2 flex items-center justify-center">
+                                        <DocumentTextIcon className="h-10 w-10 text-neutral-400" />
+                                        <p className="text-xs text-neutral-400 absolute bottom-1">Document {index + 1}</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveServiceHistoryPhoto(index)}
+                                            className="absolute top-1 right-1 bg-rose-600/80 hover:bg-rose-500 text-white rounded-full p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            aria-label="Remove document"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </section>
+            </div>
+
+            <div className="mt-10 flex justify-between items-center">
+                {step > 1 ? (
+                    <button type="button" onClick={prevStep} className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200">
+                        Back
+                    </button>
+                ) : (
+                    <div></div> // Placeholder to keep "Next" on the right
+                )}
+                
+                {step < 4 ? (
+                    <button type="button" onClick={nextStep} className="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200">
+                        Next
+                    </button>
+                ) : (
+                    <div className="text-right">
+                        <button 
+                            type="submit" 
+                            disabled={isLoading || (!isEditing && !formData.serviceHistory.trim())} // 🚨 UPDATED DISABLED PROP
+                            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 disabled:bg-gray-800 disabled:cursor-not-allowed disabled:text-gray-500"
+                        >
+                            {isLoading ? 'Processing Files...' : isEditing ? 'Update Profile' : 'Generate Profile'} {/* 🚨 UPDATED BUTTON TEXT */}
+                        </button>
+                        {!isEditing && !formData.serviceHistory.trim() && (
+                            <p className="text-xs text-rose-400 mt-2">
+                                Please provide service history notes to continue.
+                            </p>
+                        )}
+                    </div>
+                )}
+            </div>
+        </form>
+
+        {isCameraOpen && (
+            <CameraModal 
+                onClose={() => setIsCameraOpen(false)}
+                onCapture={handleCapturePhoto}
+            />
+        )}
+    </div>
+  );
+};
+
+export default VehicleForm;
