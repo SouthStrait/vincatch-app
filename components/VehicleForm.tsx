@@ -14,14 +14,22 @@ interface VehicleFormProps {
 
 // --- Firebase Storage Utility Function (NEW) ---
 const uploadFileToStorage = async (base64Data: string, type: 'photo' | 'service', vin: string, index: number, userId: string): Promise<string> => {
-    // Determine the file type and extension for storage reference
-    const mimeType = base64Data.substring(base64Data.indexOf(':') + 1, base64Data.indexOf(';'));
-    let ext = 'jpg'; 
-    if (mimeType.includes('png')) ext = 'png';
-    else if (mimeType.includes('pdf')) ext = 'pdf';
-    else if (mimeType.includes('document')) ext = 'docx';
-
-    // Create a unique path in Firebase Storage using VIN and a unique index/timestamp
+    
+    // 👇 RECOMMENDED FIX: Use regex for safer MIME type extraction
+    let ext = 'jpg'; // Default extension
+    
+    // Safely attempt to match the MIME type part: /^data:(.+?);base64,/
+    const mimeMatch = base64Data.match(/^data:(.+?);base64,/);
+    
+    if (mimeMatch && mimeMatch[1]) {
+        const mimeType = mimeMatch[1];
+        if (mimeType.includes('png')) ext = 'png';
+        else if (mimeType.includes('pdf')) ext = 'pdf';
+        else if (mimeType.includes('document')) ext = 'docx';
+        // Add more file types as needed
+    }
+    
+    // CRITICAL: Path construction is now correct and includes the userId
     const storageRef = ref(storage, `vehicles/${userId}/${vin}/${type}s/${type}-${index}-${Date.now()}.${ext}`);
 
     // uploadString handles base64 data ('data_url' format)
