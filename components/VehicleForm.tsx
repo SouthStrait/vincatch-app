@@ -1,4 +1,4 @@
-import { db, storage } from '../services/firebase'; // 🚨 MUST ensure 'storage' is exported from firebase.ts
+import { db, storage, auth } from '../services/firebase';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage'; // 🚨 NEW FIREBASE STORAGE IMPORTS
 import React, { useState, useEffect } from 'react';
 import { Vehicle } from '../types';
@@ -6,13 +6,14 @@ import PhotoUploadSlot from './PhotoUploadSlot';
 import DocumentTextIcon from './icons/DocumentTextIcon';
 import CameraModal from './CameraModal';
 
+
 interface VehicleFormProps {
   onSubmit: (vehicleData: Omit<Vehicle, 'description' | 'id' | 'createdAt'>) => void;
   initialData?: Vehicle | null;
 }
 
 // --- Firebase Storage Utility Function (NEW) ---
-const uploadFileToStorage = async (base64Data: string, type: 'photo' | 'service', vin: string, index: number): Promise<string> => {
+const uploadFileToStorage = async (base64Data: string, type: 'photo' | 'service', vin: string, index: number, userId: string): Promise<string> => {
     // Determine the file type and extension for storage reference
     const mimeType = base64Data.substring(base64Data.indexOf(':') + 1, base64Data.indexOf(';'));
     let ext = 'jpg'; 
@@ -21,7 +22,7 @@ const uploadFileToStorage = async (base64Data: string, type: 'photo' | 'service'
     else if (mimeType.includes('document')) ext = 'docx';
 
     // Create a unique path in Firebase Storage using VIN and a unique index/timestamp
-    const storageRef = ref(storage, `vehicles/${vin}/${type}s/${type}-${index}-${Date.now()}.${ext}`);
+    const storageRef = ref(storage, `vehicles/${userId}/${vin}/${type}s/${type}-${index}-${Date.now()}.${ext}`);
 
     // uploadString handles base64 data ('data_url' format)
     await uploadString(storageRef, base64Data, 'data_url');
@@ -515,6 +516,13 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, initialData }) => {
         alert("VIN is required to save photos and documents.");
         return;
     }
+const user = auth.currentUser;
+    if (!user) {
+        alert("You must be logged in to upload files.");
+        setIsLoading(false);
+        return;
+    }
+    const userId = user.uid;
 
     // Function to handle the upload logic for an array of files/urls
     const processFiles = async (files: (string | null)[], type: 'photo' | 'service'): Promise<string[]> => {
@@ -524,7 +532,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, initialData }) => {
             // Check if it's a new base64 file (starts with 'data:')
             if (dataUrl.startsWith('data:')) {
                 // Upload the file and get the persistent URL
-                const downloadUrl = await uploadFileToStorage(dataUrl, type, formData.vin, index);
+                const downloadUrl = await uploadFileToStorage(dataUrl, type, formData.vin, index, userId); 
                 return downloadUrl;
             }
             
